@@ -9,6 +9,8 @@ from database_setup import Base, Category, Item, User
 from oauth2client.client import flow_from_clientsecrets
 from oauth2client.client import FlowExchangeError
 
+from functools import wraps
+
 import random
 import string
 import httplib2
@@ -35,6 +37,15 @@ def showLogin():
                     for x in xrange(32))
     login_session['state'] = state
     return render_template('login.html', STATE=state)
+
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'username' not in login_session:
+            return redirect('/login')
+        return f(*args, **kwargs)
+    return decorated_function
 
 
 # Connect to Google authentication
@@ -99,7 +110,7 @@ def gconnect():
         return response
 
     # Store the access token in the session for later use.
-    login_session['credentials'] = credentials
+    login_session['credentials'] = credentials.access_token
     login_session['gplus_id'] = gplus_id
 
     # Get user info
@@ -136,16 +147,15 @@ def gconnect():
 # Logout from Google authentication
 @app.route('/gdisconnect')
 def gdisconnect():
-    credentials = login_session.get('credentials')
+    access_token = login_session.get('credentials')
 
-    if credentials is None:
+    if access_token is None:
         # User is not currently authenticated.
         response = make_response(json.dumps('Current user not connected.'),
                                  401)
         response.headers['Content-Type'] = 'application/json'
         return response
 
-    access_token = credentials.access_token
     print 'In gdisconnect access token is %s', access_token
     print 'User name is: '
     print login_session['username']
@@ -236,9 +246,10 @@ def showCatalog():
 
 # Create a new category
 @app.route('/catalog/new/', methods=['GET', 'POST'])
+@login_required
 def newCategory():
-    if 'username' not in login_session:
-        return redirect('/login')
+#    if 'username' not in login_session:
+#        return redirect('/login')
 
     if request.method == 'POST':
         newCategory = Category(name=request.form['name'],
@@ -254,14 +265,15 @@ def newCategory():
 # Edit a category
 @app.route('/catalog/category/<int:category_id>/edit/',
            methods=['GET', 'POST'])
+@login_required
 def editCategory(category_id):
-    if 'username' not in login_session:
-        return redirect('/login')
+    #if 'username' not in login_session:
+    #    return redirect('/login')
 
     editedCategory = session.query(Category).filter_by(id=category_id).one()
     if editedCategory.user_id != login_session['user_id']:
         return """<script>function myFunction() {
-                      alert('You are not authorised to edit this category. Please edit your own category.');
+                      alert('You are not authorised to edit this category.');
                     }
                 </script><body onload='myFunction()''>"""
 
@@ -277,14 +289,15 @@ def editCategory(category_id):
 # Delete a category
 @app.route('/catalog/category/<int:category_id>/delete/',
            methods=['GET', 'POST'])
+@login_required
 def deleteCategory(category_id):
-    if 'username' not in login_session:
-        return redirect('/login')
+#    if 'username' not in login_session:
+#        return redirect('/login')
 
     categoryToDelete = session.query(Category).filter_by(id=category_id).one()
     if categoryToDelete.user_id != login_session['user_id']:
         return """<script>function myFunction() {
-                      alert('You are not authorised to delete this category. Please create your own category in order to delete.');
+                      alert('You are not authorised to delete this category.');
                     }
                 </script><body onload='myFunction()''>"""
 
@@ -321,9 +334,10 @@ def showItems(category_id):
 
 # Create a new item
 @app.route('/catalog/category/<int:category_id>/new/', methods=['GET', 'POST'])
+@login_required
 def newItem(category_id):
-    if 'username' not in login_session:
-        return redirect('/login')
+    #if 'username' not in login_session:
+    #    return redirect('/login')
 
     category = session.query(Category).filter_by(id=category_id).one()
     if request.method == 'POST':
@@ -342,15 +356,16 @@ def newItem(category_id):
 
 
 # Edit an item
-@app.route('/catalog/item/<int:item_id>/edit', methods=['GET', 'POST'])
+@app.route('/catalog/item/<int:item_id>/edit/', methods=['GET', 'POST'])
+@login_required
 def editItem(item_id):
-    if 'username' not in login_session:
-        return redirect('/login')
+    #if 'username' not in login_session:
+    #    return redirect('/login')
 
     editedItem = session.query(Item).filter_by(id=item_id).one()
     if editedItem.user_id != login_session['user_id']:
         return """<script>function myFunction() {
-                      alert('You are not authorised to edit this item. Please edit your own item.');
+                      alert('You are not authorised to edit this item.');
                       }
                   </script><body onload='myFunction()''>"""
 
@@ -375,15 +390,16 @@ def editItem(item_id):
 
 
 # Delete an item
-@app.route('/catalog/item/<int:item_id>/delete', methods=['GET', 'POST'])
+@app.route('/catalog/item/<int:item_id>/delete/', methods=['GET', 'POST'])
+@login_required
 def deleteItem(item_id):
-    if 'username' not in login_session:
-        return redirect('/login')
+    #if 'username' not in login_session:
+    #    return redirect('/login')
 
     itemToDelete = session.query(Item).filter_by(id=item_id).one()
     if itemToDelete.user_id != login_session['user_id']:
         return """<script>function myFunction() {
-                        alert('You are not authorised to delete this item. Please create your own item in order to delete.');
+                        alert('You are not authorised to delete this item.');
                       }
                   </script><body onload='myFunction()''>"""
 
